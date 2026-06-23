@@ -404,7 +404,8 @@ function Attention({ accent }) {
       <Caption>
         Attention is how each word <b className="text-slate-200">looks at other words</b> to understand context. For a
         given word (the <span style={{ color: accent }}>query</span>), the model scores how relevant every other word
-        is, then blends their information by those scores.
+        is, then blends their information by those scores. It's part of the model's <b className="text-slate-200">architecture</b>,
+        not a separate phase — the same mechanism runs during pre-training, post-training, and inference alike.
       </Caption>
 
       {/* controls */}
@@ -634,11 +635,20 @@ function Inference({ accent }) {
 
 /* ---------- Shell ---------- */
 
+// Two orthogonal axes: the *lifecycle* (sequential phases a model goes through)
+// and the *architecture* (attention — a mechanism that runs inside every phase,
+// not a step in time). Keeping them in separate groups avoids implying that
+// attention happens "after" post-training and "before" inference.
 const STAGES = [
-  { key: "pre", title: "Pre-training", icon: Layers, sub: "learn language from raw text", C: Pretraining },
-  { key: "post", title: "Post-training", icon: Brain, sub: "shape it into an assistant", C: Posttraining },
-  { key: "attn", title: "Attention", icon: Eye, sub: "how words read context", C: Attention },
-  { key: "inf", title: "Inference", icon: Cpu, sub: "generating the answer", C: Inference },
+  { key: "pre", title: "Pre-training", icon: Layers, sub: "learn language from raw text", C: Pretraining, group: "lifecycle" },
+  { key: "post", title: "Post-training", icon: Brain, sub: "shape it into an assistant", C: Posttraining, group: "lifecycle" },
+  { key: "inf", title: "Inference", icon: Cpu, sub: "generating the answer", C: Inference, group: "lifecycle" },
+  { key: "attn", title: "Attention", icon: Eye, sub: "how words read context", C: Attention, group: "architecture" },
+];
+
+const GROUPS = [
+  { id: "lifecycle", label: "Lifecycle", blurb: "The phases a model moves through, in order — from raw text to a written answer." },
+  { id: "architecture", label: "Architecture", blurb: "Not a step in time — the mechanism running inside every phase on the left." },
 ];
 
 export default function LLMExplorer() {
@@ -647,34 +657,57 @@ export default function LLMExplorer() {
   const accent = ACCENTS[S.key];
   const Body = S.C;
 
+  const lifecycle = STAGES.filter((s) => s.group === "lifecycle");
+  const lifePos = lifecycle.indexOf(S); // position within the lifecycle (-1 if architecture)
+  const isLifecycle = S.group === "lifecycle";
+  const goLife = (delta) => {
+    const target = lifecycle[lifePos + delta];
+    if (target) setStage(STAGES.indexOf(target));
+  };
+
   return (
     <div className="min-h-screen w-full bg-slate-900 text-slate-100 p-4 sm:p-6" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
       <div className="max-w-4xl mx-auto">
         <header className="mb-5">
           <h1 className="text-2xl font-bold tracking-tight">How an LLM Works</h1>
-          <p className="text-sm text-slate-400 mt-1">An interactive walk through the four stages — from raw text to a written answer.</p>
+          <p className="text-sm text-slate-400 mt-1">An interactive walk through how a model is built and runs — plus the attention mechanism that powers every step.</p>
         </header>
 
-        {/* tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-          {STAGES.map((st, i) => {
-            const Icon = st.icon;
-            const a = ACCENTS[st.key];
-            const on = i === stage;
+        {/* tabs, split into the two axes */}
+        <div className="grid gap-4 sm:grid-cols-[1fr_auto] mb-5 items-start">
+          {GROUPS.map((g) => {
+            const items = STAGES.map((st, i) => ({ st, i })).filter(({ st }) => st.group === g.id);
             return (
-              <button key={st.key} onClick={() => setStage(i)}
-                className="text-left rounded-xl p-3 border transition-all"
-                style={{
-                  borderColor: on ? a : "#1e293b",
-                  background: on ? a + "18" : "#0f172a",
-                }}>
-                <div className="flex items-center gap-2">
-                  <Icon size={16} style={{ color: a }} />
-                  <span className="text-[10px] font-mono text-slate-600">{i + 1}</span>
+              <div key={g.id}>
+                <div className="mb-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{g.label}</h2>
+                  <p className="text-[11px] text-slate-600 leading-tight mt-0.5">{g.blurb}</p>
                 </div>
-                <div className="text-sm font-semibold mt-1.5" style={{ color: on ? "#fff" : "#cbd5e1" }}>{st.title}</div>
-                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{st.sub}</div>
-              </button>
+                <div className={"grid gap-2 " + (g.id === "lifecycle" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1")}>
+                  {items.map(({ st, i }, j) => {
+                    const Icon = st.icon;
+                    const a = ACCENTS[st.key];
+                    const on = i === stage;
+                    return (
+                      <button key={st.key} onClick={() => setStage(i)}
+                        className="text-left rounded-xl p-3 border transition-all sm:w-44"
+                        style={{
+                          borderColor: on ? a : "#1e293b",
+                          background: on ? a + "18" : "#0f172a",
+                        }}>
+                        <div className="flex items-center gap-2">
+                          <Icon size={16} style={{ color: a }} />
+                          <span className="text-[10px] font-mono text-slate-600">
+                            {g.id === "lifecycle" ? j + 1 : "↑"}
+                          </span>
+                        </div>
+                        <div className="text-sm font-semibold mt-1.5" style={{ color: on ? "#fff" : "#cbd5e1" }}>{st.title}</div>
+                        <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{st.sub}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>
@@ -682,24 +715,32 @@ export default function LLMExplorer() {
         {/* body */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono" style={{ color: accent }}>STAGE {stage + 1}</span>
+            <span className="text-xs font-mono" style={{ color: accent }}>
+              {isLifecycle ? `PHASE ${lifePos + 1} OF ${lifecycle.length}` : "ARCHITECTURE"}
+            </span>
             <h2 className="text-lg font-bold">{S.title}</h2>
           </div>
           <Body accent={accent} />
         </div>
 
-        {/* nav */}
-        <div className="flex justify-between mt-4">
-          <button disabled={stage === 0} onClick={() => setStage((s) => s - 1)}
-            className="px-4 py-2 rounded-lg text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed">
-            ← Previous
-          </button>
-          <button disabled={stage === STAGES.length - 1} onClick={() => setStage((s) => s + 1)}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: stage === STAGES.length - 1 ? "#334155" : accent }}>
-            Next →
-          </button>
-        </div>
+        {/* nav — only the lifecycle is a sequence; attention is not */}
+        {isLifecycle ? (
+          <div className="flex justify-between mt-4">
+            <button disabled={lifePos === 0} onClick={() => goLife(-1)}
+              className="px-4 py-2 rounded-lg text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed">
+              ← Previous
+            </button>
+            <button disabled={lifePos === lifecycle.length - 1} onClick={() => goLife(1)}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ background: lifePos === lifecycle.length - 1 ? "#334155" : accent }}>
+              Next →
+            </button>
+          </div>
+        ) : (
+          <p className="text-center text-xs text-slate-500 mt-4">
+            Attention isn’t a phase in time — it runs inside every lifecycle phase above. Pick one to see where.
+          </p>
+        )}
       </div>
     </div>
   );

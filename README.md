@@ -7,17 +7,24 @@ text to a written answer. Built with React, TypeScript, Vite, and Tailwind CSS.
 
 ## What's inside
 
-The app walks through four stages, each with an animated, interactive
-visualization and a "Under the hood" deep-dive:
+The app is organized along two distinct axes, each panel with an animated,
+interactive visualization and an "Under the hood" deep-dive.
+
+**Lifecycle** — the sequential phases a model moves through, in order:
 
 1. **Pre-training** — the model learns language by predicting the next token
    over enormous batches of text, nudging its weights down a loss curve.
 2. **Post-training** — the base model is shaped into a helpful assistant via
    supervised fine-tuning, preference modeling, and RLHF.
-3. **Attention** — explore how each word attends to others, with a live
-   attention heatmap, selectable query words, and multiple heads.
-4. **Inference** — watch autoregressive generation token by token, see the KV
+3. **Inference** — watch autoregressive generation token by token, see the KV
    cache fill, and a context window with an optional sliding mode.
+
+**Architecture** — not a step in time, but the mechanism running *inside* every
+phase above:
+
+- **Attention** — explore how each word attends to others, with a live
+  attention heatmap, selectable query words, and multiple heads. The same
+  mechanism is active during pre-training, post-training, and inference alike.
 
 ## Run it locally
 
