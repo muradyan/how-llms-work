@@ -1,15 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Boxes, Sigma } from "lucide-react";
 import { Explorer } from "./LLMExplorer";
 import ServingMath from "./ServingMath";
 
+type PageId = "explorer" | "math";
+
 const PAGES = [
-  { id: "explorer", label: "Explorer", sub: "how an LLM works", icon: Boxes, accent: "#38bdf8" },
-  { id: "math", label: "Deep Dive", sub: "the math of serving", icon: Sigma, accent: "#f472b6" },
-];
+  { id: "explorer", label: "Explorer", sub: "how an LLM works", icon: Boxes, accent: "#38bdf8", slug: "explorer" },
+  { id: "math", label: "Deep Dive", sub: "the math of serving", icon: Sigma, accent: "#f472b6", slug: "deep-dive" },
+] as const;
+
+// Hash-based routing keeps each page on its own shareable URL without needing
+// any server config (works as-is on GitHub Pages): #/explorer and #/deep-dive.
+function pageFromHash(): PageId {
+  return window.location.hash.replace(/^#\/?/, "") === "deep-dive" ? "math" : "explorer";
+}
 
 export default function App() {
-  const [page, setPage] = useState<"explorer" | "math">("explorer");
+  const [page, setPage] = useState<PageId>(pageFromHash);
+
+  useEffect(() => {
+    const onHash = () => setPage(pageFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const go = (id: PageId) => {
+    const slug = id === "math" ? "deep-dive" : "explorer";
+    window.location.hash = `#/${slug}`; // updates the URL; hashchange syncs state
+  };
 
   return (
     <div
@@ -26,7 +45,7 @@ export default function App() {
               return (
                 <button
                   key={p.id}
-                  onClick={() => setPage(p.id as "explorer" | "math")}
+                  onClick={() => go(p.id)}
                   className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors"
                   style={{
                     background: on ? p.accent + "22" : "transparent",
