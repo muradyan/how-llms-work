@@ -239,7 +239,12 @@ export default function ServingMath() {
           bandwidth) and doing math (compute). The actual time is the larger of the two:
         </p>
         <Eq>{String.raw`T \;=\; \max\!\left(t_{\text{compute}},\; t_{\text{mem}}\right)`}</Eq>
-        <p>The compute term scales with how many tokens you process; the memory term is loading the weights plus the KV cache:</p>
+        <p>
+          The compute term scales with how many tokens you process; the memory term is loading the weights plus
+          the <b className="text-slate-200">KV cache</b> — the Key and Value vectors the model stores for every
+          token it has already seen, so it can attend to them without recomputing them each step (see the
+          Explorer's Inference panel):
+        </p>
         <Eq>{String.raw`t_{\text{compute}} = \frac{B \cdot N_{\text{active}}}{\text{FLOPs}} \qquad t_{\text{mem}} = \frac{N_{\text{total}} + B \cdot \text{len}_{\text{ctx}} \cdot \text{KV}_{\text{bytes}}}{\text{mem\_bw}}`}</Eq>
         <p>
           where <Tex>{String.raw`B`}</Tex> is batch size, <Tex>{String.raw`N_{\text{active}}`}</Tex> the active
