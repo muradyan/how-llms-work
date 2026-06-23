@@ -1173,7 +1173,7 @@ const GROUPS = [
   { id: "architecture", label: "Architecture", blurb: "Not steps in time — the machinery running inside every phase above." },
 ];
 
-export default function LLMExplorer() {
+export function Explorer() {
   const [stage, setStage] = useState(0);
   const S = STAGES[stage];
   const accent = ACCENTS[S.key];
@@ -1188,14 +1188,10 @@ export default function LLMExplorer() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-900 text-slate-100 p-4 sm:p-6" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-5">
-          <h1 className="text-2xl font-bold tracking-tight">How an LLM Works</h1>
-          <p className="text-sm text-slate-400 mt-1">An interactive walk through how a model is built and runs — plus the attention mechanism that powers every step.</p>
-        </header>
+    <div>
+      <p className="text-sm text-slate-400 mb-5">An interactive walk through how a model is built and runs — plus the attention mechanism that powers every step.</p>
 
-        {/* tabs, split into the two axes (lifecycle stacked above architecture) */}
+      {/* tabs, split into the two axes (lifecycle stacked above architecture) */}
         <div className="space-y-4 mb-5">
           {GROUPS.map((g) => {
             const items = STAGES.map((st, i) => ({ st, i })).filter(({ st }) => st.group === g.id);
@@ -1264,7 +1260,6 @@ export default function LLMExplorer() {
             Attention isn’t a phase in time — it runs inside every lifecycle phase above. Pick one to see where.
           </p>
         )}
-      </div>
     </div>
   );
 }

@@ -44,6 +44,26 @@ phase above:
   grouped by theme: GQA/MQA/MLA & sliding-window attention, RoPE, RMSNorm,
   SwiGLU, MoE, quantization, speculative decoding, FlashAttention, and Mamba/SSMs.
 
+## Deep Dive — the math of serving LLMs
+
+A second page (toggle **Deep Dive** in the top bar) is a study summary of Reiner
+Pope's chalkboard lecture *"How GPT, Claude, and Gemini are actually trained and
+served"* on the [Dwarkesh Podcast](https://www.dwarkesh.com/p/reiner-pope). It
+keeps the important formulas (typeset with KaTeX), constants, worked examples,
+and schematic redraws of the figures:
+
+- the roofline model `T = max(t_compute, t_mem)` and the arithmetic-intensity
+  constant **≈ 300**;
+- the required batch size `B ≥ 300 / sparsity` (DeepSeek V3 → ~2,400);
+- the ~15–20 ms HBM "train", MoE all-to-all rack layout, and pipeline bubbles;
+- the `6ND` law and the **~100× over-training** vs Chinchilla argument;
+- reading long-context prices off the menu (`bytes/token = (1/300)·N_active/len`).
+
+All credit to Reiner Pope and the Dwarkesh Podcast; the page is a community
+summary for learning and links the original [video](https://www.youtube.com/watch?v=xmkSf5IS-zw),
+[transcript](https://www.dwarkesh.com/p/reiner-pope), and
+[flashcards](https://flashcards.dwarkesh.com/reiner-pope/).
+
 ## Run it locally
 
 Requires [Node.js](https://nodejs.org/) 18+.
