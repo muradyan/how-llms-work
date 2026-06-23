@@ -206,7 +206,6 @@ export default function ServingMath() {
     <div>
       {/* header / attribution */}
       <div className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: ACC + "44", background: ACC + "0d" }}>
-        <div className="text-xs uppercase tracking-wide mb-1" style={{ color: ACC }}>Deep dive · summary of a talk</div>
         <h1 className="text-xl font-bold text-slate-100">The math behind how LLMs are trained and served</h1>
         <p className="text-sm text-slate-300 mt-2 leading-relaxed">
           A study summary of Reiner Pope's chalkboard lecture on the <b className="text-slate-200">Dwarkesh
