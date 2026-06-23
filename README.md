@@ -10,21 +10,32 @@ text to a written answer. Built with React, TypeScript, Vite, and Tailwind CSS.
 The app is organized along two distinct axes, each panel with an animated,
 interactive visualization and an "Under the hood" deep-dive.
 
-**Lifecycle** — the sequential phases a model moves through, in order:
+**Lifecycle** — the sequential phases a model moves through, in order. Each
+carries a **cost badge** showing the rough GPU count, wall-clock time, and
+relative compute for a representative ~70B-class model:
 
 1. **Pre-training** — the model learns language by predicting the next token
    over enormous batches of text, nudging its weights down a loss curve.
+   (~1,000–16,000+ GPUs, weeks–months — by far the dominant cost.)
 2. **Post-training** — the base model is shaped into a helpful assistant via
-   supervised fine-tuning, preference modeling, and RLHF.
+   supervised fine-tuning, preference modeling, and RLHF. (~tens–hundreds of
+   GPUs, hours–days.)
 3. **Inference** — watch autoregressive generation token by token, see the KV
-   cache fill, and a context window with an optional sliding mode.
+   cache fill, and a context window with an optional sliding mode. (~1–8 GPUs
+   per request, ~tens of ms/token.)
 
-**Architecture** — not a step in time, but the mechanism running *inside* every
+**Architecture** — not steps in time, but the machinery running *inside* every
 phase above:
 
+- **Parameters** — what "X billion parameters" actually means: the *weights*
+  (learned, fixed, shipped in the model file) versus the *context* (transient,
+  per-request). Includes a composition breakdown (embeddings / attention / FFN)
+  and a "build the number" calculator.
 - **Attention** — explore how each word attends to others, with a live
-  attention heatmap, selectable query words, and multiple heads. The same
-  mechanism is active during pre-training, post-training, and inference alike.
+  attention heatmap, selectable query words, and multiple heads.
+- **Mixture of Experts** — how a router sends each token to just a few of many
+  expert FFNs, so total parameters can be huge while compute per token stays
+  small ("X total / Y active"), with an animated routing visualization.
 
 ## Run it locally
 

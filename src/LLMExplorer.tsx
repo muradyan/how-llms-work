@@ -1,10 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Brain, Layers, Eye, Cpu, Play, Pause, SkipForward, RotateCcw,
-  ChevronDown, Database, Sparkles, ArrowRight, Check, Repeat
+  ChevronDown, Database, Sparkles, ArrowRight, Check, Repeat,
+  SlidersHorizontal, Network, Server, Clock, Coins
 } from "lucide-react";
 
-const ACCENTS = { pre: "#38bdf8", post: "#a78bfa", attn: "#fbbf24", inf: "#34d399" };
+const ACCENTS = {
+  pre: "#38bdf8", post: "#a78bfa", attn: "#fbbf24", inf: "#34d399",
+  params: "#f472b6", moe: "#22d3ee",
+};
 
 /* ---------- shared bits ---------- */
 
@@ -633,6 +637,313 @@ function Inference({ accent }) {
   );
 }
 
+/* ---------- Cost badges (time / GPUs per lifecycle stage) ---------- */
+
+const COSTS = {
+  pre:  { gpus: "1,000 – 16,000+",   time: "weeks – months",       bar: 100, note: "By far the most expensive step — millions of GPU-hours on a huge cluster." },
+  post: { gpus: "tens – few hundred", time: "hours – days",         bar: 50,  note: "Tiny next to pre-training: small curated datasets, far fewer GPUs." },
+  inf:  { gpus: "1 – 8 per request",  time: "~tens of ms / token",  bar: 22,  note: "Cheap per request, but total cost scales with how many users you serve." },
+};
+
+function Stat({ icon: Icon, label, value, accent }: {
+  icon: any; label: string; value: string; accent?: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+        <Icon size={12} style={{ color: accent }} /> {label}
+      </div>
+      <div className="text-sm font-semibold text-slate-200">{value}</div>
+    </div>
+  );
+}
+
+function CostStrip({ gpus, time, bar, note, accent }: {
+  gpus: string; time: string; bar: number; note: string; accent?: string;
+}) {
+  return (
+    <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950 p-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Stat icon={Server} label="GPUs" value={gpus} accent={accent} />
+        <Stat icon={Clock} label="Wall-clock" value={time} accent={accent} />
+        <div>
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+            <Coins size={12} style={{ color: accent }} /> relative compute
+          </div>
+          <div className="h-4 rounded bg-slate-800 overflow-hidden">
+            <div className="h-full rounded transition-all" style={{ width: `${bar}%`, background: accent }} />
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">log scale — pre-training dominates</div>
+        </div>
+      </div>
+      <div className="text-xs text-slate-400 mt-2.5 flex items-start gap-1.5">
+        <span style={{ color: accent }}>≈</span>
+        <span>{note} <span className="text-slate-500">Rough, for a ~70B-class model.</span></span>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Architecture: Parameters ---------- */
+
+const PARAM_PRESETS = [
+  { name: "Small", d: 1024, layers: 24, vocab: 50000 },
+  { name: "Medium", d: 4096, layers: 32, vocab: 100000 },
+  { name: "Large", d: 8192, layers: 80, vocab: 128000 },
+];
+
+function fmtB(n: number) {
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(0) + "M";
+  return n.toLocaleString();
+}
+function fmtBytes(n: number) {
+  if (n >= 1e9) return (n / 1e9).toFixed(0) + " GB";
+  if (n >= 1e6) return (n / 1e6).toFixed(0) + " MB";
+  return n + " B";
+}
+function paramBreakdown({ d, layers, vocab }: { d: number; layers: number; vocab: number }) {
+  const embed = 2 * vocab * d;     // input embedding + output unembedding
+  const attn = layers * 4 * d * d; // Q, K, V, O projections
+  const ffn = layers * 8 * d * d;  // up (≈4×) + down projections
+  return { embed, attn, ffn, total: embed + attn + ffn };
+}
+
+function Parameters({ accent }: { accent: string }) {
+  const [preset, setPreset] = useState(1);
+  const [hov, setHov] = useState<string | null>(null);
+  const cfg = PARAM_PRESETS[preset];
+  const b = paramBreakdown(cfg);
+  const bytes = b.total * 2; // ~2 bytes/param at 16-bit precision
+  const segs = [
+    { key: "embed", label: "Embeddings", v: b.embed, formula: "2 × vocab × d_model", color: "#64748b" },
+    { key: "attn", label: "Attention (Q/K/V/O)", v: b.attn, formula: "layers × 4 × d_model²", color: "#fbbf24" },
+    { key: "ffn", label: "FFN / MLP", v: b.ffn, formula: "layers × 8 × d_model²", color: accent },
+  ];
+
+  return (
+    <div>
+      <Caption>
+        A model's "<b className="text-slate-200">{fmtB(b.total)} parameters</b>" are its individual learned
+        numbers — the <b className="text-slate-200">weights</b> packed into its matrices. They're fixed after
+        training and shipped in the model file. They are <b className="text-slate-200">not</b> the{" "}
+        <span style={{ color: accent }}>context</span> you send at runtime.
+      </Caption>
+
+      {/* weights vs context */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border p-3" style={{ borderColor: accent + "55", background: accent + "0d" }}>
+          <div className="text-xs uppercase tracking-wide mb-1" style={{ color: accent }}>Weights · learned, fixed</div>
+          <div className="text-sm text-slate-300">
+            Billions of numbers set during training. Identical for every user and every request. Stored on disk
+            (~<b className="text-slate-200">{fmtBytes(bytes)}</b> at 16-bit) and loaded into GPU memory.
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-700 p-3 bg-slate-900">
+          <div className="text-xs uppercase tracking-wide mb-1 text-slate-400">Context · transient, per-request</div>
+          <div className="text-sm text-slate-300">
+            Your prompt + the reply tokens, plus their KV cache. Different every request, discarded afterwards.
+            Counts against the <b className="text-slate-200">context window</b> — never against the parameter total.
+          </div>
+        </div>
+      </div>
+
+      {/* composition */}
+      <div className="mt-5">
+        <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Where the parameters live</div>
+          <div className="flex gap-1">
+            {PARAM_PRESETS.map((p, i) => (
+              <button key={p.name} onClick={() => setPreset(i)}
+                className="px-2 py-1 rounded-md text-xs border transition-colors"
+                style={{
+                  borderColor: i === preset ? accent : "#334155",
+                  background: i === preset ? accent + "22" : "#1e293b",
+                  color: i === preset ? "#e2e8f0" : "#94a3b8",
+                }}>{p.name}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex h-8 rounded-lg overflow-hidden border border-slate-800">
+          {segs.map((s) => (
+            <div key={s.key}
+              onMouseEnter={() => setHov(s.key)} onMouseLeave={() => setHov(null)}
+              className="h-full flex items-center justify-center text-[10px] font-medium transition-all"
+              style={{
+                width: `${(s.v / b.total) * 100}%`,
+                background: s.color + (hov && hov !== s.key ? "55" : "ee"),
+                color: "#0f172a",
+              }}>
+              {(s.v / b.total) * 100 >= 12 ? `${Math.round((s.v / b.total) * 100)}%` : ""}
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 space-y-1">
+          {segs.map((s) => (
+            <div key={s.key} className="flex items-center gap-2 text-xs"
+              style={{ opacity: hov && hov !== s.key ? 0.5 : 1 }}>
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
+              <span className="text-slate-300 w-44 shrink-0">{s.label}</span>
+              <span className="font-mono text-slate-400 w-12 shrink-0">{fmtB(s.v)}</span>
+              <span className="text-slate-600 font-mono hidden sm:inline">{s.formula}</span>
+            </div>
+          ))}
+        </div>
+        <Caption>
+          d_model = {cfg.d.toLocaleString()}, layers = {cfg.layers}, vocab = {cfg.vocab.toLocaleString()} →{" "}
+          <b className="text-slate-200">{fmtB(b.total)}</b> total. The <span style={{ color: accent }}>FFN</span>{" "}
+          blocks usually dominate — roughly two-thirds of the weights.
+        </Caption>
+      </div>
+
+      <UnderHood accent={accent}>
+        <p>
+          Every parameter is just one number in a matrix — attention projections, FFN layers, embeddings, plus
+          tiny LayerNorm scales (omitted here). The headline count is simply the <i>sum of all those matrix
+          sizes</i>; nothing more mysterious.
+        </p>
+        <p>
+          At inference the weights are <b className="text-slate-300">frozen</b>. What changes between requests is
+          the context flowing through them — the activations and KV cache — which is why two people get different
+          answers from the exact same parameters.
+        </p>
+      </UnderHood>
+    </div>
+  );
+}
+
+/* ---------- Architecture: Mixture of Experts ---------- */
+
+const MOE_TOKENS = ["The", "cat", "sat", "quietly", "on", "the", "warm", "mat"];
+const N_EXPERTS = 8;
+const TOP_K = 2;
+
+function expertScores(token: string, t: number) {
+  // Deterministic pseudo-router: varies by token characters + a rotating bias.
+  return Array.from({ length: N_EXPERTS }, (_, e) => {
+    const base = token.charCodeAt((e + token.length) % token.length) || 65;
+    return ((base * (e + 3) + t * 7) % 17) / 17 + (e === token.length % N_EXPERTS ? 0.6 : 0);
+  });
+}
+function topKIdx(scores: number[], k: number) {
+  return scores
+    .map((s, i) => [s, i] as [number, number])
+    .sort((a, b) => b[0] - a[0])
+    .slice(0, k)
+    .map(([, i]) => i);
+}
+
+function MoE({ accent }: { accent: string }) {
+  const [playing, setPlaying] = useState(true);
+  const [tick, setTick] = useState(0);
+  useTicker(playing, 1400, () => setTick((t) => t + 1));
+  const tokIdx = tick % MOE_TOKENS.length;
+  const token = MOE_TOKENS[tokIdx];
+  const scores = useMemo(() => expertScores(token, tick), [token, tick]);
+  const chosen = useMemo(() => topKIdx(scores, TOP_K), [scores]);
+  const chosenSet = new Set(chosen);
+
+  return (
+    <div>
+      <Caption>
+        In a normal transformer block every token flows through one big <b className="text-slate-200">FFN</b>.
+        A <b className="text-slate-200">Mixture of Experts</b> replaces that single FFN with many expert FFNs plus
+        a <span style={{ color: accent }}>router</span> that sends each token to just a few of them.
+      </Caption>
+
+      {/* current token */}
+      <div className="mt-4 flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs uppercase tracking-wide text-slate-500 mr-1">Routing token:</span>
+        {MOE_TOKENS.map((t, i) => (
+          <Chip key={i} text={t} color={accent} lit={i === tokIdx} pulse={i === tokIdx} dim={i !== tokIdx} />
+        ))}
+      </div>
+
+      {/* router -> experts */}
+      <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+        <div className="flex items-center justify-center gap-2 mb-3 flex-wrap">
+          <div className="rounded-lg px-3 py-1.5 border text-sm font-semibold"
+            style={{ borderColor: accent, background: accent + "18", color: "#e2e8f0" }}>Router</div>
+          <span className="text-xs text-slate-500">scores all {N_EXPERTS} experts, keeps the top {TOP_K}</span>
+        </div>
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+          {scores.map((s, e) => {
+            const on = chosenSet.has(e);
+            return (
+              <div key={e} className="rounded-lg border p-2 text-center transition-all"
+                style={{
+                  borderColor: on ? accent : "#334155",
+                  background: on ? accent + "22" : "#1e293b",
+                  boxShadow: on ? `0 0 0 1.5px ${accent}` : "none",
+                }}>
+                <div className="text-[10px] text-slate-500">E{e + 1}</div>
+                <div className="h-10 flex items-end justify-center mt-1">
+                  <div className="w-3 rounded-t transition-all"
+                    style={{ height: `${20 + s * 60}%`, background: on ? accent : "#475569" }} />
+                </div>
+                <div className="text-[9px] font-mono mt-1" style={{ color: on ? accent : "#64748b" }}>{s.toFixed(2)}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-xs text-slate-400 mt-3 text-center">
+          “<span style={{ color: accent }}>{token}</span>” → experts{" "}
+          <b className="text-slate-200">{chosen.map((c) => "E" + (c + 1)).join(" & ")}</b>. The other{" "}
+          {N_EXPERTS - TOP_K} stay idle for this token.
+        </div>
+      </div>
+
+      {/* active vs total */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
+          <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Total parameters</div>
+          <div className="text-sm text-slate-300">
+            All {N_EXPERTS} experts sit in memory at once — that's the big headline parameter count.
+          </div>
+          <div className="flex gap-1 mt-2">
+            {Array.from({ length: N_EXPERTS }).map((_, e) => (
+              <div key={e} className="flex-1 h-3 rounded-sm" style={{ background: accent + "55" }} />
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border p-3" style={{ borderColor: accent + "55", background: accent + "0d" }}>
+          <div className="text-xs uppercase tracking-wide mb-1" style={{ color: accent }}>Active per token</div>
+          <div className="text-sm text-slate-300">
+            Only {TOP_K} of {N_EXPERTS} experts actually run — about{" "}
+            <b className="text-slate-200">{Math.round((TOP_K / N_EXPERTS) * 100)}%</b> of the FFN work per token.
+            Big brain, small bill.
+          </div>
+          <div className="flex gap-1 mt-2">
+            {Array.from({ length: N_EXPERTS }).map((_, e) => (
+              <div key={e} className="flex-1 h-3 rounded-sm" style={{ background: chosenSet.has(e) ? accent : "#1e293b" }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Controls
+        playing={playing} setPlaying={setPlaying} accent={accent}
+        onStep={() => { setPlaying(false); setTick((t) => t + 1); }}
+        onReset={() => { setTick(0); }}
+      />
+
+      <UnderHood accent={accent}>
+        <p>
+          The router is a small learned layer: it scores the experts for each token, applies{" "}
+          <span className="font-mono">softmax</span>, and routes to the top-{TOP_K}. Because only a fraction run,
+          an MoE can hold far more total parameters (capacity / knowledge) while keeping compute per token roughly
+          constant — which is why such models advertise “<b className="text-slate-300">X total / Y active</b>”.
+        </p>
+        <p>
+          Trade-offs: every expert must occupy GPU memory even while idle, and training needs{" "}
+          <b className="text-slate-300">load balancing</b> so the router doesn't lean on a few favourite experts.
+          Experts tend to specialize in different kinds of tokens.
+        </p>
+      </UnderHood>
+    </div>
+  );
+}
+
 /* ---------- Shell ---------- */
 
 // Two orthogonal axes: the *lifecycle* (sequential phases a model goes through)
@@ -643,12 +954,14 @@ const STAGES = [
   { key: "pre", title: "Pre-training", icon: Layers, sub: "learn language from raw text", C: Pretraining, group: "lifecycle" },
   { key: "post", title: "Post-training", icon: Brain, sub: "shape it into an assistant", C: Posttraining, group: "lifecycle" },
   { key: "inf", title: "Inference", icon: Cpu, sub: "generating the answer", C: Inference, group: "lifecycle" },
+  { key: "params", title: "Parameters", icon: SlidersHorizontal, sub: "what the weights are", C: Parameters, group: "architecture" },
   { key: "attn", title: "Attention", icon: Eye, sub: "how words read context", C: Attention, group: "architecture" },
+  { key: "moe", title: "Mixture of Experts", icon: Network, sub: "scaling with sparse FFNs", C: MoE, group: "architecture" },
 ];
 
 const GROUPS = [
   { id: "lifecycle", label: "Lifecycle", blurb: "The phases a model moves through, in order — from raw text to a written answer." },
-  { id: "architecture", label: "Architecture", blurb: "Not a step in time — the mechanism running inside every phase on the left." },
+  { id: "architecture", label: "Architecture", blurb: "Not steps in time — the machinery running inside every phase above." },
 ];
 
 export default function LLMExplorer() {
@@ -673,8 +986,8 @@ export default function LLMExplorer() {
           <p className="text-sm text-slate-400 mt-1">An interactive walk through how a model is built and runs — plus the attention mechanism that powers every step.</p>
         </header>
 
-        {/* tabs, split into the two axes */}
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto] mb-5 items-start">
+        {/* tabs, split into the two axes (lifecycle stacked above architecture) */}
+        <div className="space-y-4 mb-5">
           {GROUPS.map((g) => {
             const items = STAGES.map((st, i) => ({ st, i })).filter(({ st }) => st.group === g.id);
             return (
@@ -683,14 +996,14 @@ export default function LLMExplorer() {
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{g.label}</h2>
                   <p className="text-[11px] text-slate-600 leading-tight mt-0.5">{g.blurb}</p>
                 </div>
-                <div className={"grid gap-2 " + (g.id === "lifecycle" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1")}>
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-3">
                   {items.map(({ st, i }, j) => {
                     const Icon = st.icon;
                     const a = ACCENTS[st.key];
                     const on = i === stage;
                     return (
                       <button key={st.key} onClick={() => setStage(i)}
-                        className={"text-left rounded-xl p-3 border transition-all w-full" + (g.id === "architecture" ? " sm:w-44" : "")}
+                        className="text-left rounded-xl p-3 border transition-all w-full"
                         style={{
                           borderColor: on ? a : "#1e293b",
                           background: on ? a + "18" : "#0f172a",
@@ -698,7 +1011,7 @@ export default function LLMExplorer() {
                         <div className="flex items-center gap-2">
                           <Icon size={16} style={{ color: a }} />
                           <span className="text-[10px] font-mono text-slate-600">
-                            {g.id === "lifecycle" ? j + 1 : "↑"}
+                            {g.id === "lifecycle" ? j + 1 : "·"}
                           </span>
                         </div>
                         <div className="text-sm font-semibold mt-1.5" style={{ color: on ? "#fff" : "#cbd5e1" }}>{st.title}</div>
@@ -720,6 +1033,7 @@ export default function LLMExplorer() {
             </span>
             <h2 className="text-lg font-bold">{S.title}</h2>
           </div>
+          {isLifecycle && <CostStrip {...COSTS[S.key as keyof typeof COSTS]} accent={accent} />}
           <Body accent={accent} />
         </div>
 
