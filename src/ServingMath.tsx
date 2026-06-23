@@ -247,9 +247,11 @@ export default function ServingMath() {
         </p>
         <Eq>{String.raw`t_{\text{compute}} = \frac{B \cdot N_{\text{active}}}{\text{FLOPs}} \qquad t_{\text{mem}} = \frac{N_{\text{total}} + B \cdot \text{len}_{\text{ctx}} \cdot \text{KV}_{\text{bytes}}}{\text{mem\_bw}}`}</Eq>
         <p>
-          where <Tex>{String.raw`B`}</Tex> is batch size, <Tex>{String.raw`N_{\text{active}}`}</Tex> the active
-          parameters, and <Tex>{String.raw`N_{\text{total}}`}</Tex> the total. Almost everything else —
-          batching, MoE layout, pipelining, API price tiers — is a corollary of which term dominates.
+          where <Tex>{String.raw`B`}</Tex> is the <b className="text-slate-200">batch size</b> — how many tokens
+          (from many different users' requests) the GPU processes together in one pass, reusing the same weight
+          fetch for all of them — <Tex>{String.raw`N_{\text{active}}`}</Tex> the active parameters, and{" "}
+          <Tex>{String.raw`N_{\text{total}}`}</Tex> the total. Almost everything else — batching, MoE layout,
+          pipelining, API price tiers — is a corollary of which term dominates.
         </p>
         <Figure
           title="Figure · latency vs batch size"
@@ -267,7 +269,7 @@ export default function ServingMath() {
         </p>
         <div className="grid grid-cols-3 gap-2 my-3">
           <KeyNum value="≈ 300" label="FLOPs : memory-bandwidth ratio" />
-          <KeyNum value="15–20 ms" label="HBM capacity ÷ bandwidth (one full sweep)" />
+          <KeyNum value="15–20 ms" label="GPU memory capacity ÷ bandwidth (one full sweep)" />
           <KeyNum value="scale-up size" label="GPUs reachable at full NVLink bandwidth" />
         </div>
         <p>
@@ -296,8 +298,9 @@ export default function ServingMath() {
 
       <Section n="04" title="The ~20 ms 'train' and how fast you can serve">
         <p>
-          A second constant: memory capacity ÷ bandwidth is how long it takes to read every weight once — like
-          a train that departs on a fixed schedule. Miss it and the FLOPs sit idle.
+          A second constant comes from <b className="text-slate-200">HBM</b> — the High-Bandwidth Memory stacked
+          on the GPU that holds the weights and KV cache. Its capacity ÷ bandwidth is how long it takes to read
+          every weight once — like a train that departs on a fixed schedule. Miss it and the FLOPs sit idle.
         </p>
         <Eq>{String.raw`t_{\text{sweep}} = \frac{\text{HBM capacity}}{\text{mem\_bw}} \approx 15\text{–}20\,\text{ms} \qquad \text{(Rubin: } 288\,\text{GB} / 20\,\text{TB/s} \approx 15\,\text{ms)}`}</Eq>
         <Example title="Back-of-envelope throughput">
