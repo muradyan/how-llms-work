@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Brain, Layers, Eye, Cpu, Play, Pause, SkipForward, RotateCcw,
   ChevronDown, Database, Sparkles, ArrowRight, Check, Repeat,
-  SlidersHorizontal, Network, Server, Clock, Coins
+  SlidersHorizontal, Network, Server, Clock, Coins, Boxes, Rocket
 } from "lucide-react";
 
 const ACCENTS = {
   pre: "#38bdf8", post: "#a78bfa", attn: "#fbbf24", inf: "#34d399",
-  params: "#f472b6", moe: "#22d3ee",
+  params: "#f472b6", moe: "#22d3ee", transformer: "#fb923c", modern: "#a3e635",
 };
 
 /* ---------- shared bits ---------- */
@@ -709,6 +709,15 @@ function paramBreakdown({ d, layers, vocab }: { d: number; layers: number; vocab
   return { embed, attn, ffn, total: embed + attn + ffn };
 }
 
+function Term({ term, children }: { term: string; children: any }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
+      <div className="text-sm font-semibold text-slate-200">{term}</div>
+      <div className="text-xs text-slate-400 leading-relaxed mt-0.5">{children}</div>
+    </div>
+  );
+}
+
 function Parameters({ accent }: { accent: string }) {
   const [preset, setPreset] = useState(1);
   const [hov, setHov] = useState<string | null>(null);
@@ -716,9 +725,12 @@ function Parameters({ accent }: { accent: string }) {
   const b = paramBreakdown(cfg);
   const bytes = b.total * 2; // ~2 bytes/param at 16-bit precision
   const segs = [
-    { key: "embed", label: "Embeddings", v: b.embed, formula: "2 × vocab × d_model", color: "#64748b" },
-    { key: "attn", label: "Attention (Q/K/V/O)", v: b.attn, formula: "layers × 4 × d_model²", color: "#fbbf24" },
-    { key: "ffn", label: "FFN / MLP", v: b.ffn, formula: "layers × 8 × d_model²", color: accent },
+    { key: "embed", label: "Embeddings", v: b.embed, color: "#64748b",
+      calc: `2 × ${cfg.vocab.toLocaleString()} × ${cfg.d.toLocaleString()} = ${fmtB(b.embed)}` },
+    { key: "attn", label: "Attention (Q/K/V/O)", v: b.attn, color: "#fbbf24",
+      calc: `${cfg.layers} × 4 × ${cfg.d.toLocaleString()}² = ${fmtB(b.attn)}` },
+    { key: "ffn", label: "FFN / MLP", v: b.ffn, color: accent,
+      calc: `${cfg.layers} × 8 × ${cfg.d.toLocaleString()}² = ${fmtB(b.ffn)}` },
   ];
 
   return (
@@ -748,10 +760,37 @@ function Parameters({ accent }: { accent: string }) {
         </div>
       </div>
 
+      {/* key terms */}
+      <div className="mt-5">
+        <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Key terms</div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Term term="d_model">
+            The width of the vector representing each token as it flows through the model — every token is a list
+            of <b className="text-slate-300">{cfg.d.toLocaleString()}</b> numbers here. Bigger = richer
+            representation; most compute scales with d_model².
+          </Term>
+          <Term term="Embeddings">
+            A lookup table turning each token id into a d_model vector (input), plus a matching matrix mapping back
+            to vocabulary scores at the end (output / “unembedding”). Each is{" "}
+            <span className="font-mono">vocab × d_model</span> — that's the <span className="font-mono">2 ×</span>.
+          </Term>
+          <Term term="FFN / MLP">
+            The feed-forward network inside every block: two linear layers with a nonlinearity that expand to
+            ~4× d_model and back. <b className="text-slate-300">FFN</b> (feed-forward network) and{" "}
+            <b className="text-slate-300">MLP</b> (multi-layer perceptron) are two names for the same thing.
+          </Term>
+          <Term term="vocab · layers">
+            <b className="text-slate-300">vocab</b> = how many distinct tokens the model knows
+            ({cfg.vocab.toLocaleString()}). <b className="text-slate-300">layers</b> = how many transformer blocks
+            are stacked ({cfg.layers}).
+          </Term>
+        </div>
+      </div>
+
       {/* composition */}
       <div className="mt-5">
         <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Where the parameters live</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">Where the parameters live · the math</div>
           <div className="flex gap-1">
             {PARAM_PRESETS.map((p, i) => (
               <button key={p.name} onClick={() => setPreset(i)}
@@ -778,21 +817,23 @@ function Parameters({ accent }: { accent: string }) {
             </div>
           ))}
         </div>
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-1.5">
           {segs.map((s) => (
-            <div key={s.key} className="flex items-center gap-2 text-xs"
+            <div key={s.key} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs"
+              onMouseEnter={() => setHov(s.key)} onMouseLeave={() => setHov(null)}
               style={{ opacity: hov && hov !== s.key ? 0.5 : 1 }}>
               <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
-              <span className="text-slate-300 w-44 shrink-0">{s.label}</span>
-              <span className="font-mono text-slate-400 w-12 shrink-0">{fmtB(s.v)}</span>
-              <span className="text-slate-600 font-mono hidden sm:inline">{s.formula}</span>
+              <span className="text-slate-300 w-40 shrink-0">{s.label}</span>
+              <span className="font-mono text-slate-500">{s.calc}</span>
             </div>
           ))}
         </div>
         <Caption>
-          d_model = {cfg.d.toLocaleString()}, layers = {cfg.layers}, vocab = {cfg.vocab.toLocaleString()} →{" "}
-          <b className="text-slate-200">{fmtB(b.total)}</b> total. The <span style={{ color: accent }}>FFN</span>{" "}
-          blocks usually dominate — roughly two-thirds of the weights.
+          So the count is just summed matrix sizes. With d_model = {cfg.d.toLocaleString()}, layers ={" "}
+          {cfg.layers}, vocab = {cfg.vocab.toLocaleString()}, the embeddings alone are{" "}
+          <span className="font-mono text-slate-300">2 × {cfg.vocab.toLocaleString()} × {cfg.d.toLocaleString()} = {fmtB(b.embed)}</span>
+          {" "}→ <b className="text-slate-200">{fmtB(b.total)}</b> total. The <span style={{ color: accent }}>FFN</span>{" "}
+          blocks usually dominate, roughly two-thirds of the weights.
         </Caption>
       </div>
 
@@ -944,6 +985,172 @@ function MoE({ accent }: { accent: string }) {
   );
 }
 
+/* ---------- Architecture: The Transformer ---------- */
+
+const TF_PARTS: Record<string, { label: string; desc: string }> = {
+  tokens: { label: "Input tokens", desc: "Your prompt, split by the tokenizer into discrete tokens (word pieces)." },
+  embed: { label: "Embeddings (token + position)", desc: "A lookup table turns each token id into a d_model vector; position information is added so word order matters." },
+  attn: { label: "Multi-Head Attention", desc: "Every token looks at the others and blends in relevant context (see the Attention panel). A residual connection adds the input back, then it's normalized." },
+  ffn: { label: "Feed-Forward (FFN / MLP)", desc: "Each token is processed on its own through a 2-layer network. Most of the model's parameters live here. Residual + norm again." },
+  out: { label: "Final norm → Output projection", desc: "The final vector is mapped (via the unembedding matrix) to a score for every token in the vocabulary." },
+  probs: { label: "Next-token probabilities", desc: "Softmax turns those scores into probabilities; one token is chosen and fed back in (see the Inference panel)." },
+};
+
+function TFBox({ id, sel, setSel, color, children, sub }: {
+  id: string; sel: string; setSel: (s: string) => void; color: string; children: any; sub?: string;
+}) {
+  const on = sel === id;
+  return (
+    <button onClick={() => setSel(id)}
+      className="w-full rounded-lg border p-2.5 text-center transition-all"
+      style={{
+        borderColor: on ? color : "#334155",
+        background: on ? color + "22" : "#0f172a",
+        boxShadow: on ? `0 0 0 1.5px ${color}` : "none",
+      }}>
+      <div className="text-sm font-semibold text-slate-200">{children}</div>
+      {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
+    </button>
+  );
+}
+
+function Down() {
+  return <div className="flex justify-center py-1"><ArrowRight size={16} className="text-slate-600 rotate-90" /></div>;
+}
+
+function Transformer({ accent }: { accent: string }) {
+  const [sel, setSel] = useState<string>("attn");
+  return (
+    <div>
+      <Caption>
+        Almost every modern LLM is a tall stack of identical <b className="text-slate-200">transformer blocks</b>.
+        Here's the whole path a token takes, top to bottom — tap any part to see what it does.
+      </Caption>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[1fr_240px] items-start">
+        {/* diagram */}
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+          <TFBox id="tokens" sel={sel} setSel={setSel} color="#94a3b8">Input tokens</TFBox>
+          <Down />
+          <TFBox id="embed" sel={sel} setSel={setSel} color="#64748b" sub="token id → d_model vector (+ position)">Embeddings</TFBox>
+          <Down />
+          <div className="rounded-xl border-2 border-dashed p-2.5 relative mt-1.5" style={{ borderColor: accent + "77" }}>
+            <span className="absolute -top-2.5 left-3 px-1.5 text-[10px] font-mono rounded"
+              style={{ background: "#020617", color: accent }}>Transformer block × N</span>
+            <div className="pt-1">
+              <TFBox id="attn" sel={sel} setSel={setSel} color="#fbbf24" sub="mixes info between tokens · + residual & norm">Multi-Head Attention</TFBox>
+              <Down />
+              <TFBox id="ffn" sel={sel} setSel={setSel} color="#f472b6" sub="processes each token · most params live here">Feed-Forward (FFN / MLP)</TFBox>
+            </div>
+          </div>
+          <Down />
+          <TFBox id="out" sel={sel} setSel={setSel} color={accent} sub="unembedding → a score per vocab token">Final norm → Output projection</TFBox>
+          <Down />
+          <TFBox id="probs" sel={sel} setSel={setSel} color="#34d399">Next-token probabilities</TFBox>
+        </div>
+
+        {/* description */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 md:sticky md:top-3">
+          <div className="text-xs uppercase tracking-wide mb-1" style={{ color: accent }}>{TF_PARTS[sel].label}</div>
+          <div className="text-sm text-slate-300 leading-relaxed">{TF_PARTS[sel].desc}</div>
+        </div>
+      </div>
+
+      <UnderHood accent={accent}>
+        <p>
+          The same block is stacked <b className="text-slate-300">N</b> times (the “layers” count). Data flows up a
+          <b className="text-slate-300"> residual stream</b> that each block reads from and adds back to. Attention
+          mixes information <i>between</i> tokens; the FFN processes <i>each</i> token on its own.
+        </p>
+        <p>
+          These boxes map directly onto the Parameters panel: the embeddings, the attention projections, and the
+          FFN layers (repeated × N) are exactly where the billions of weights sit.
+        </p>
+      </UnderHood>
+    </div>
+  );
+}
+
+/* ---------- Architecture: Modern variants ---------- */
+
+const VARIANTS = [
+  {
+    theme: "Attention efficiency",
+    items: [
+      { name: "GQA / MQA", blurb: "Query heads share a smaller set of Key/Value heads, shrinking the KV cache → less memory and faster long-context inference." },
+      { name: "MLA (Multi-head Latent Attention)", blurb: "Compresses Key/Value into a small latent vector (popularized by DeepSeek) for an even tinier cache." },
+      { name: "Sliding-window attention", blurb: "Each token attends only to a recent window instead of the whole sequence (e.g. Mistral), making long contexts cheap." },
+    ],
+  },
+  {
+    theme: "Positional & normalization",
+    items: [
+      { name: "RoPE (rotary embeddings)", blurb: "Encodes position by rotating the Query/Key vectors — generalizes to longer contexts better than fixed position tables." },
+      { name: "RMSNorm", blurb: "A cheaper, simpler replacement for LayerNorm; now the default normalization in most LLMs." },
+    ],
+  },
+  {
+    theme: "Activations & sparsity",
+    items: [
+      { name: "SwiGLU", blurb: "A gated activation inside the FFN that consistently beats plain ReLU/GELU — standard in modern models." },
+      { name: "Mixture of Experts", blurb: "Route each token to a few expert FFNs so total parameters can be huge while compute per token stays small. (See the MoE panel.)" },
+    ],
+  },
+  {
+    theme: "Faster inference",
+    items: [
+      { name: "Quantization", blurb: "Store and run weights at 8- or 4-bit instead of 16-bit → far less memory and higher throughput, with little quality loss." },
+      { name: "Speculative decoding", blurb: "A small draft model guesses several tokens that the big model verifies in one pass → faster generation, identical output." },
+      { name: "FlashAttention", blurb: "A memory-efficient GPU kernel computing exact attention without storing the huge score matrix — near-universal now." },
+    ],
+  },
+  {
+    theme: "Beyond transformers",
+    items: [
+      { name: "State-space models / Mamba", blurb: "Sequence models with sub-quadratic cost that scale to very long inputs; sometimes hybridized with attention." },
+    ],
+  },
+];
+
+function ModernVariants({ accent }: { accent: string }) {
+  return (
+    <div>
+      <Caption>
+        Mixture of Experts is one of many tricks layered on top of the basic transformer. These are the ones you'll
+        meet most often in today's models — and most are used <b className="text-slate-200">together</b>.
+      </Caption>
+
+      <div className="mt-4 space-y-4">
+        {VARIANTS.map((grp) => (
+          <div key={grp.theme}>
+            <div className="text-xs uppercase tracking-wide mb-2" style={{ color: accent }}>{grp.theme}</div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {grp.items.map((it) => (
+                <div key={it.name} className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+                  <div className="text-sm font-semibold text-slate-200">{it.name}</div>
+                  <div className="text-xs text-slate-400 leading-relaxed mt-1">{it.blurb}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <UnderHood accent={accent}>
+        <p>
+          A typical modern open model stacks several of these at once — e.g. <b className="text-slate-300">RoPE +
+          GQA + RMSNorm + SwiGLU</b>, often with <b className="text-slate-300">MoE</b> for capacity, then served
+          with <b className="text-slate-300">quantization</b> and <b className="text-slate-300">FlashAttention</b>.
+        </p>
+        <p>
+          Most of them target the same two pressures: the quadratic cost of attention on long sequences, and the
+          memory/latency of serving very large models.
+        </p>
+      </UnderHood>
+    </div>
+  );
+}
+
 /* ---------- Shell ---------- */
 
 // Two orthogonal axes: the *lifecycle* (sequential phases a model goes through)
@@ -954,9 +1161,11 @@ const STAGES = [
   { key: "pre", title: "Pre-training", icon: Layers, sub: "learn language from raw text", C: Pretraining, group: "lifecycle" },
   { key: "post", title: "Post-training", icon: Brain, sub: "shape it into an assistant", C: Posttraining, group: "lifecycle" },
   { key: "inf", title: "Inference", icon: Cpu, sub: "generating the answer", C: Inference, group: "lifecycle" },
+  { key: "transformer", title: "The Transformer", icon: Boxes, sub: "the model, drawn out", C: Transformer, group: "architecture" },
   { key: "params", title: "Parameters", icon: SlidersHorizontal, sub: "what the weights are", C: Parameters, group: "architecture" },
   { key: "attn", title: "Attention", icon: Eye, sub: "how words read context", C: Attention, group: "architecture" },
   { key: "moe", title: "Mixture of Experts", icon: Network, sub: "scaling with sparse FFNs", C: MoE, group: "architecture" },
+  { key: "modern", title: "Modern variants", icon: Rocket, sub: "what else is popular now", C: ModernVariants, group: "architecture" },
 ];
 
 const GROUPS = [

@@ -27,15 +27,22 @@ relative compute for a representative ~70B-class model:
 **Architecture** — not steps in time, but the machinery running *inside* every
 phase above:
 
+- **The Transformer** — the whole model drawn out as a clickable diagram:
+  tokens → embeddings → N × [attention + feed-forward, with residuals & norm] →
+  output projection → next-token probabilities. Tap any box for what it does.
 - **Parameters** — what "X billion parameters" actually means: the *weights*
   (learned, fixed, shipped in the model file) versus the *context* (transient,
-  per-request). Includes a composition breakdown (embeddings / attention / FFN)
-  and a "build the number" calculator.
+  per-request). Defines the key terms (d_model, embeddings, FFN/MLP, vocab,
+  layers), shows a composition breakdown with the **actual arithmetic** (e.g.
+  `2 × 100,000 × 4,096 = 819M` for embeddings), and a "build the number" calculator.
 - **Attention** — explore how each word attends to others, with a live
   attention heatmap, selectable query words, and multiple heads.
 - **Mixture of Experts** — how a router sends each token to just a few of many
   expert FFNs, so total parameters can be huge while compute per token stays
   small ("X total / Y active"), with an animated routing visualization.
+- **Modern variants** — a survey of techniques popular in today's models,
+  grouped by theme: GQA/MQA/MLA & sliding-window attention, RoPE, RMSNorm,
+  SwiGLU, MoE, quantization, speculative decoding, FlashAttention, and Mamba/SSMs.
 
 ## Run it locally
 
