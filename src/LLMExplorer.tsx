@@ -690,7 +690,7 @@ export default function LLMExplorer() {
                     const on = i === stage;
                     return (
                       <button key={st.key} onClick={() => setStage(i)}
-                        className="text-left rounded-xl p-3 border transition-all sm:w-44"
+                        className={"text-left rounded-xl p-3 border transition-all w-full" + (g.id === "architecture" ? " sm:w-44" : "")}
                         style={{
                           borderColor: on ? a : "#1e293b",
                           background: on ? a + "18" : "#0f172a",
