@@ -273,6 +273,13 @@ export default function ServingMath() {
           weights are fetched once and reused — so below this batch you're just waiting on memory. A dense model
           balances at <Tex>{String.raw`B \approx 300`}</Tex>; a sparse one needs proportionally more.
         </p>
+        <p>
+          <b className="text-slate-200">Why sparsity is a multiplier:</b> across a full batch tokens scatter to
+          every expert, so you still must load <i>all</i> the weights (<Tex>{String.raw`N_{\text{total}}`}</Tex>) —
+          but each token only does <Tex>{String.raw`N_{\text{active}}`}</Tex> worth of math on them. So each token
+          pays off a <Tex>{String.raw`1/\text{sparsity}`}</Tex> fraction of the load, and you need{" "}
+          <Tex>{String.raw`\text{total}/\text{active}`}</Tex> more tokens to keep the loaded weights busy.
+        </p>
         <Example>
           <p><b className="text-slate-200">DeepSeek V3</b> activates 32 of 256 experts → sparsity = 256 ÷ 32 = 8.</p>
           <p><Tex>{String.raw`B \ge 300 \times 8 = 2{,}400`}</Tex> tokens (in practice 2–3× that). This is why serving is a batching game.</p>
