@@ -130,7 +130,7 @@ function CostBatchFig() {
       <text x={X1 - 2} y={myFn(floor, vmax) - 3} fontSize="8" fill="#94a3b8" textAnchor="end">compute floor</text>
       <polyline points={poly(cost, vmax)} fill="none" stroke={C_TOTAL} strokeWidth="2.6" strokeLinejoin="round" />
       <line x1={mx(0.42)} y1={Y0} x2={mx(0.42)} y2={Y1} stroke="#475569" strokeDasharray="2 3" />
-      <text x={mx(0.42) + 3} y={Y1 + 8} fontSize="8" fill="#94a3b8">B ≈ 300 / sparsity</text>
+      <text x={mx(0.42) + 3} y={Y1 + 8} fontSize="8" fill="#94a3b8">B ≈ 300 × sparsity</text>
     </svg>
   );
 }
@@ -212,7 +212,9 @@ export default function ServingMath() {
       <Section n="01" title="The roofline model: time = max(compute, memory)">
         <p>
           Every forward pass through a transformer is bounded by two resources — moving bytes (memory
-          bandwidth) and doing math (compute). The actual time is the larger of the two:
+          bandwidth) and doing math (compute). The actual time <Tex>{String.raw`T`}</Tex> — the latency of
+          one pass through the <i>whole</i> model (all layers, not a single expert), which in decode is the time
+          to produce one more token — is the larger of the two:
         </p>
         <Eq>{String.raw`T \;=\; \max\!\left(t_{\text{compute}},\; t_{\text{mem}}\right)`}</Eq>
         <p>
@@ -224,8 +226,11 @@ export default function ServingMath() {
         <Eq>{String.raw`t_{\text{compute}} = \frac{B \cdot N_{\text{active}}}{\text{FLOPs}} \qquad t_{\text{mem}} = \frac{N_{\text{total}} + B \cdot \text{len}_{\text{ctx}} \cdot \text{KV}_{\text{bytes}}}{\text{mem\_bw}}`}</Eq>
         <p>
           where <Tex>{String.raw`B`}</Tex> is the <b className="text-slate-200">batch size</b> — how many tokens
-          (from many different users' requests) the GPU processes together in one pass, reusing the same weight
-          fetch for all of them — <Tex>{String.raw`N_{\text{active}}`}</Tex> the active parameters, and{" "}
+          the GPU processes together in one pass, reusing the same weight fetch for all of them. It is
+          <i> not</i> one request's tokens: the server pools many users together. In decode, each sequence
+          contributes ~1 new token per step, so <Tex>{String.raw`B`}</Tex> is roughly the number of users being
+          served at once; in prefill it's the prompt tokens being crunched in parallel.
+          <Tex>{String.raw`N_{\text{active}}`}</Tex> is the active parameters,{" "}
           <Tex>{String.raw`N_{\text{total}}`}</Tex> the total. Almost everything else — batching, MoE layout,
           pipelining, API price tiers — is a corollary of which term dominates.
         </p>
@@ -243,6 +248,11 @@ export default function ServingMath() {
           dimensionless by accounting for bytes per operation (an FP4 multiply is half a byte), it lands around
           the same number on essentially every modern GPU:
         </p>
+        <p>
+          <b className="text-slate-200">300 is not a batch size.</b> It's a property of the silicon —
+          roughly <b className="text-slate-200">300 math operations for every byte</b> read from memory
+          (its "arithmetic intensity"). The batch size you actually need is <i>derived</i> from it in §03.
+        </p>
         <div className="grid grid-cols-3 gap-2 my-3">
           <KeyNum value="≈ 300" label="FLOPs : memory-bandwidth ratio" />
           <KeyNum value="15–20 ms" label="GPU memory capacity ÷ bandwidth (one full sweep)" />
@@ -254,15 +264,17 @@ export default function ServingMath() {
         </p>
       </Section>
 
-      <Section n="03" title="Required batch size: B ≥ 300 / sparsity">
+      <Section n="03" title="Required batch size: B ≥ 300 × sparsity">
         <p>Solving "compute time = weight-fetch time" for the batch size gives the minimum batch you must serve to keep the GPU busy:</p>
-        <Eq>{String.raw`B \;=\; \frac{\text{FLOPs}}{\text{mem\_bw}} \cdot \frac{N_{\text{total}}}{N_{\text{active}}} \;=\; 300 \cdot \frac{1}{\text{sparsity}}`}</Eq>
+        <Eq>{String.raw`B \;=\; \frac{\text{FLOPs}}{\text{mem\_bw}} \cdot \frac{N_{\text{total}}}{N_{\text{active}}} \;=\; 300 \cdot \underbrace{\frac{N_{\text{total}}}{N_{\text{active}}}}_{\text{sparsity}}`}</Eq>
         <p>
-          Compute scales with <Tex>{String.raw`B`}</Tex> (every token needs its own matmul) while the weights
-          are fetched once and reused — so below this batch you're just waiting on memory.
+          Here <b className="text-slate-200">sparsity</b> = total ÷ active parameters (a dense model is 1; an MoE
+          is bigger). Compute scales with <Tex>{String.raw`B`}</Tex> (every token needs its own matmul) while the
+          weights are fetched once and reused — so below this batch you're just waiting on memory. A dense model
+          balances at <Tex>{String.raw`B \approx 300`}</Tex>; a sparse one needs proportionally more.
         </p>
         <Example>
-          <p><b className="text-slate-200">DeepSeek V3</b> activates 32 of 256 experts → sparsity = 8.</p>
+          <p><b className="text-slate-200">DeepSeek V3</b> activates 32 of 256 experts → sparsity = 256 ÷ 32 = 8.</p>
           <p><Tex>{String.raw`B \ge 300 \times 8 = 2{,}400`}</Tex> tokens (in practice 2–3× that). This is why serving is a batching game.</p>
         </Example>
         <Figure
@@ -276,9 +288,15 @@ export default function ServingMath() {
         <p>
           A second constant comes from <b className="text-slate-200">HBM</b> — the High-Bandwidth Memory stacked
           on the GPU that holds the weights and KV cache. Its capacity ÷ bandwidth is how long it takes to read
-          every weight once — like a train that departs on a fixed schedule. Miss it and the FLOPs sit idle.
+          every weight once — one full <b className="text-slate-200">sweep</b> of memory — like a train that
+          departs on a fixed schedule. Miss it and the FLOPs sit idle.
         </p>
         <Eq>{String.raw`t_{\text{sweep}} = \frac{\text{HBM capacity}}{\text{mem\_bw}} \approx 15\text{–}20\,\text{ms} \qquad \text{(Rubin: } 288\,\text{GB} / 20\,\text{TB/s} \approx 15\,\text{ms)}`}</Eq>
+        <p>
+          This is also the <b className="text-slate-200">latency</b> of one forward pass at the balance batch: since
+          the pass is bounded by reading the weights once, generating one more token (in decode) takes about one
+          sweep, ~15–20 ms. That ties §02's "300" (which sets the batch) to how fast each token comes out.
+        </p>
         <Example title="Back-of-envelope throughput">
           <p>One rack at batch ≈ 2,000, ~64 layers worth of work per sweep → on the order of <Tex>{String.raw`2{,}000 \times 64 \approx 128{,}000`}</Tex> tokens/sec.</p>
           <p>Gemini reportedly serves <i>hundreds of millions</i> of tokens/sec — so a single rack is roughly one-thousandth of Gemini. To compete you need at least ~1/1000 of that fleet.</p>
