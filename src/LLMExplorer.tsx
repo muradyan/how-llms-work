@@ -892,6 +892,37 @@ function MoE({ accent }: { accent: string }) {
         a <span style={{ color: accent }}>router</span> that sends each token to just a few of them.
       </Caption>
 
+      {/* where it sits inside a transformer block */}
+      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-3">
+        <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Where it sits in a transformer block</div>
+        <div className="flex items-stretch gap-1.5 flex-wrap">
+          <div className="flex items-center justify-center text-center px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-[11px] text-slate-400">
+            residual<br />stream
+          </div>
+          <ArrowRight size={14} className="text-slate-600 self-center shrink-0" />
+          <div className="px-2.5 py-1.5 rounded-lg border text-center" style={{ borderColor: "#fbbf2455", background: "#fbbf2411" }}>
+            <div className="text-xs font-semibold text-slate-200">Attention</div>
+            <div className="text-[10px] text-slate-500">+ Add &amp; Norm</div>
+          </div>
+          <ArrowRight size={14} className="text-slate-600 self-center shrink-0" />
+          <div className="px-2.5 py-1.5 rounded-lg border-2 text-center" style={{ borderColor: accent, background: accent + "1f" }}>
+            <div className="text-sm font-semibold text-slate-100">MoE: Router → Experts</div>
+            <div className="text-[10px]" style={{ color: accent }}>replaces the dense FFN · + Add &amp; Norm</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">▼ zoomed in below</div>
+          </div>
+          <ArrowRight size={14} className="text-slate-600 self-center shrink-0" />
+          <div className="flex items-center justify-center text-center px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-[11px] text-slate-400">
+            residual<br />stream
+          </div>
+        </div>
+        <Caption>
+          An MoE block sits exactly where the dense <b className="text-slate-200">FFN</b> would — right after
+          attention, inside every transformer block. Only the FFN is swapped for{" "}
+          <span style={{ color: accent }}>router → experts</span>; attention, the residual stream, and the norms
+          are unchanged. Everything below zooms into that highlighted box.
+        </Caption>
+      </div>
+
       {/* current token */}
       <div className="mt-4 flex items-center gap-1.5 flex-wrap">
         <span className="text-xs uppercase tracking-wide text-slate-500 mr-1">Routing token:</span>
