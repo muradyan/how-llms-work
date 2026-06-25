@@ -207,30 +207,6 @@ export default function ServingMath() {
       {/* header / attribution */}
       <div className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: ACC + "44", background: ACC + "0d" }}>
         <h1 className="text-xl font-bold text-slate-100">The math behind how LLMs are trained and served</h1>
-        <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-          A study summary of Reiner Pope's chalkboard lecture on the <b className="text-slate-200">Dwarkesh
-          Podcast</b>. With a handful of equations, public API prices, and some chalk, he derives why API
-          pricing, GPU rack design, and model architecture look the way they do. Reiner is CEO of the chip
-          startup <b className="text-slate-200">MatX</b> and previously worked on TPU architecture at Google.
-        </p>
-        <div className="flex flex-wrap gap-2 mt-3 text-sm">
-          <a href="https://www.youtube.com/watch?v=xmkSf5IS-zw" target="_blank" rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 hover:bg-slate-800 transition-colors">
-            <Youtube size={15} style={{ color: ACC }} /> Watch the video <ExternalLink size={11} className="text-slate-500" />
-          </a>
-          <a href="https://www.dwarkesh.com/p/reiner-pope" target="_blank" rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 hover:bg-slate-800 transition-colors">
-            <FileText size={15} style={{ color: ACC }} /> Transcript <ExternalLink size={11} className="text-slate-500" />
-          </a>
-          <a href="https://flashcards.dwarkesh.com/reiner-pope/" target="_blank" rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 hover:bg-slate-800 transition-colors">
-            <GraduationCap size={15} style={{ color: ACC }} /> Flashcards & math <ExternalLink size={11} className="text-slate-500" />
-          </a>
-        </div>
-        <p className="text-[11px] text-slate-500 mt-3">
-          All credit to Reiner Pope and the Dwarkesh Podcast. This is a community summary for learning; figures
-          below are schematic redraws of the chalkboard, not exact reproductions.
-        </p>
       </div>
 
       <Section n="01" title="The roofline model: time = max(compute, memory)">
